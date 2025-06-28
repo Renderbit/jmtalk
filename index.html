@@ -326,96 +326,127 @@
         </div>
     </div>
 
-    <script>
-        // 간단하고 확실한 localStorage 기반 채팅
-        let customerId = localStorage.getItem('customerId') || 'customer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('customerId', customerId);
+  <script>
+    // localStorage 대신 window 객체 사용
+    if (!window.chatData) {
+        window.chatData = {
+            messages: [],
+            customers: {},
+            lastUpdate: 0
+        };
+    }
+
+    let customerId = 'customer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    let lastMessageCount = 0;
+
+    // 메시지 전송
+    window.sendMessage = function() {
+        const input = document.getElementById('messageInput');
+        const message = input.value.trim();
         
-        let lastMessageCount = 0;
-
-        // 메시지 전송
-        window.sendMessage = function() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-            
-            if (!message) return;
-            
-            const messageData = {
-                id: Date.now(),
-                customerId: customerId,
-                type: 'customer',
-                content: message,
-                timestamp: Date.now(),
-                time: getCurrentTime()
-            };
-            
-            // 로컬에 즉시 표시
-            addMessage(messageData);
-            input.value = '';
-            
-            // localStorage에 저장
-            saveMessage(messageData);
+        if (!message) return;
+        
+        const messageData = {
+            id: Date.now(),
+            customerId: customerId,
+            type: 'customer',
+            content: message,
+            timestamp: Date.now(),
+            time: getCurrentTime()
         };
+        
+        // 로컬에 즉시 표시
+        addMessage(messageData);
+        input.value = '';
+        
+        // window 객체에 저장
+        saveMessage(messageData);
+    };
 
-        // 빠른 답변
-        window.sendQuickReply = function(message) {
-            const messageData = {
-                id: Date.now(),
-                customerId: customerId,
-                type: 'customer',
-                content: message,
-                timestamp: Date.now(),
-                time: getCurrentTime()
-            };
-            
-            addMessage(messageData);
-            saveMessage(messageData);
+    // 빠른 답변
+    window.sendQuickReply = function(message) {
+        const messageData = {
+            id: Date.now(),
+            customerId: customerId,
+            type: 'customer',
+            content: message,
+            timestamp: Date.now(),
+            time: getCurrentTime()
         };
+        
+        addMessage(messageData);
+        saveMessage(messageData);
+    };
 
-        // 메시지 저장
-        function saveMessage(messageData) {
+    // 메시지 저장 (window 객체 사용)
+    function saveMessage(messageData) {
+        try {
+            // localStorage 시도
             let messages = JSON.parse(localStorage.getItem('jm_chat_messages') || '[]');
             messages.push(messageData);
             localStorage.setItem('jm_chat_messages', JSON.stringify(messages));
-            
-            // 업데이트 플래그 설정
             localStorage.setItem('jm_chat_updated', Date.now().toString());
+        } catch (e) {
+            // localStorage 실패시 window 객체 사용
+            window.chatData.messages.push(messageData);
+            window.chatData.lastUpdate = Date.now();
+            
+            // 브라우저 간 통신을 위해 postMessage 사용
+            window.postMessage({
+                type: 'CHAT_MESSAGE',
+                data: messageData
+            }, '*');
         }
+    }
 
-        // 메시지 표시
-        function addMessage(messageData) {
-            const messagesContainer = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${messageData.type === 'customer' ? 'user' : ''}`;
-            messageDiv.setAttribute('data-id', messageData.id);
-            
-            const avatarClass = messageData.type === 'customer' ? 'user-avatar' : 'agent-avatar';
-            const avatarText = messageData.type === 'customer' ? '고' : '정';
-            
-            messageDiv.innerHTML = `
-                <div class="message-avatar ${avatarClass}">${avatarText}</div>
-                <div>
-                    <div class="message-content">${messageData.content}</div>
-                    <div class="message-time">${messageData.time}</div>
-                </div>
-            `;
-            
-            messagesContainer.appendChild(messageDiv);
-            scrollToBottom();
-        }
+    // 메시지 표시
+    function addMessage(messageData) {
+        const messagesContainer = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${messageData.type === 'customer' ? 'user' : ''}`;
+        messageDiv.setAttribute('data-id', messageData.id);
+        
+        const avatarClass = messageData.type === 'customer' ? 'user-avatar' : 'agent-avatar';
+        const avatarText = messageData.type === 'customer' ? '고' : '정';
+        
+        messageDiv.innerHTML = `
+            <div class="message-avatar ${avatarClass}">${avatarText}</div>
+            <div>
+                <div class="message-content">${messageData.content}</div>
+                <div class="message-time">${messageData.time}</div>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        scrollToBottom();
+    }
 
-        // 새 메시지 체크
-        function checkNewMessages() {
+    // 새 메시지 체크
+    function checkNewMessages() {
+        try {
             const messages = JSON.parse(localStorage.getItem('jm_chat_messages') || '[]');
             const myMessages = messages.filter(msg => msg.customerId === customerId);
             
             if (myMessages.length > lastMessageCount) {
-                // 기존 메시지 제거 (초기 메시지 제외)
                 const messagesContainer = document.getElementById('messages');
                 const existingMessages = messagesContainer.querySelectorAll('.message[data-id]');
                 existingMessages.forEach(msg => msg.remove());
                 
-                // 모든 메시지 다시 표시
+                myMessages.forEach(messageData => {
+                    addMessage(messageData);
+                });
+                
+                lastMessageCount = myMessages.length;
+            }
+        } catch (e) {
+            // localStorage 실패시 window 객체에서 체크
+            const myMessages = window.chatData.messages.filter(msg => msg.customerId === customerId);
+            
+            if (myMessages.length > lastMessageCount) {
+                const messagesContainer = document.getElementById('messages');
+                const existingMessages = messagesContainer.querySelectorAll('.message[data-id]');
+                existingMessages.forEach(msg => msg.remove());
+                
                 myMessages.forEach(messageData => {
                     addMessage(messageData);
                 });
@@ -423,35 +454,44 @@
                 lastMessageCount = myMessages.length;
             }
         }
+    }
 
-        // 유틸리티 함수들
-        function getCurrentTime() {
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const ampm = hours >= 12 ? '오후' : '오전';
-            const displayHours = hours % 12 || 12;
-            return `${ampm} ${displayHours}:${minutes.toString().padStart(2, '0')}`;
-        }
-
-        function scrollToBottom() {
-            const messagesContainer = document.getElementById('messages');
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        window.handleKeyPress = function(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
+    // postMessage 수신
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'CHAT_MESSAGE' && event.data.data.customerId === customerId) {
+            if (event.data.data.type === 'agent') {
+                addMessage(event.data.data);
             }
-        };
+        }
+    });
 
-        // 초기화
-        document.getElementById('messageInput').focus();
-        
-        // 1초마다 새 메시지 체크
-        setInterval(checkNewMessages, 1000);
-        
-        console.log('고객 ID:', customerId);
-    </script>
+    // 유틸리티 함수들
+    function getCurrentTime() {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const ampm = hours >= 12 ? '오후' : '오전';
+        const displayHours = hours % 12 || 12;
+        return `${ampm} ${displayHours}:${minutes.toString().padStart(2, '0')}`;
+    }
+
+    function scrollToBottom() {
+        const messagesContainer = document.getElementById('messages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    window.handleKeyPress = function(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    };
+
+    // 초기화
+    document.getElementById('messageInput').focus();
+    setInterval(checkNewMessages, 1000);
+    
+    console.log('고객 ID:', customerId);
+    console.log('localStorage 지원:', typeof(Storage) !== "undefined");
+</script>
 </body>
 </html>
