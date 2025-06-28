@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>정밀티켓 - 고객 상담</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+            background-color: #f8f9fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .chat-container {
+            max-width: 400px;
+            height: 700px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #5865f2, #7289da);
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-height: 80px;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .header-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .header-info p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .chat-welcome {
+            padding: 1.5rem 1.5rem;
+            text-align: center;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .welcome-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #5865f2, #7289da);
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .welcome-text h4 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .welcome-text p {
+            color: #6c757d;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background: white;
+            min-height: 250px;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .agent-avatar {
+            background: linear-gradient(135deg, #5865f2, #7289da);
+            color: white;
+        }
+
+        .user-avatar {
+            background: #e9ecef;
+            color: #6c757d;
+        }
+
+        .message-content {
+            background: #f8f9fa;
+            padding: 0.75rem 1rem;
+            border-radius: 18px;
+            max-width: 70%;
+            position: relative;
+        }
+
+        .message.user .message-content {
+            background: #5865f2;
+            color: white;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: #adb5bd;
+            margin-top: 0.25rem;
+        }
+
+        .quick-replies {
+            padding: 0.75rem;
+            border-top: 1px solid #e9ecef;
+            background: #f8f9fa;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+
+        .quick-replies h5 {
+            color: #6c757d;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .reply-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .reply-btn {
+            background: white;
+            border: 1px solid #e9ecef;
+            padding: 0.6rem 0.8rem;
+            border-radius: 8px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+            color: #495057;
+        }
+
+        .reply-btn:hover {
+            border-color: #5865f2;
+            background: #f8f9fa;
+        }
+
+        .chat-input {
+            padding: 1rem;
+            border-top: 1px solid #e9ecef;
+            background: white;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e9ecef;
+            border-radius: 20px;
+            outline: none;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field:focus {
+            border-color: #5865f2;
+        }
+
+        .send-btn {
+            width: 36px;
+            height: 36px;
+            background: #5865f2;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+
+        .send-btn:hover {
+            background: #4752c4;
+        }
+
+        .send-btn:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 0.5rem 1rem;
+            color: #6c757d;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        .typing-dots {
+            display: inline-flex;
+            gap: 0.2rem;
+            margin-left: 0.5rem;
+        }
+
+        .typing-dots span {
+            width: 4px;
+            height: 4px;
+            background: #6c757d;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .system-message {
+            text-align: center;
+            padding: 0.5rem;
+            color: #6c757d;
+            font-size: 0.8rem;
+            margin: 1rem 0;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        .connection-status.disconnected {
+            background: #dc3545;
+        }
+
+        @media (max-width: 480px) {
+            .chat-container {
+                max-width: 100%;
+                height: 100vh;
+                margin: 0;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">🟢 상담원과 연결됨</div>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="brand-logo">정</div>
+            <div class="header-info">
+                <h3>정밀티켓</h3>
+                <p><span class="status-indicator"></span>온라인 상담 가능</p>
+            </div>
+            <button class="close-btn" onclick="closeChat()">&times;</button>
+        </div>
+
+        <div class="chat-welcome">
+            <div class="welcome-avatar">정</div>
+            <div class="welcome-text">
+                <h4>안녕하세요! 정밀티켓입니다 👋</h4>
+                <p>무엇을 도와드릴까요?<br>언제든지 편하게 문의해 주세요.</p>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="messages">
+            <div class="system-message">
+                오늘 오후 2:30
+            </div>
+            
+            <div class="message">
+                <div class="message-avatar agent-avatar">정</div>
+                <div>
+                    <div class="message-content">
+                        안녕하세요! 정밀티켓 고객지원팀입니다.<br>
+                        무엇을 도와드릴까요? 😊
+                    </div>
+                    <div class="message-time">오후 2:30</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="quick-replies">
+            <h5>자주 묻는 질문</h5>
+            <div class="reply-buttons">
+                <button class="reply-btn" onclick="sendQuickReply('서비스 이용 방법이 궁금해요')">
+                    📋 서비스 이용 방법이 궁금해요
+                </button>
+                <button class="reply-btn" onclick="sendQuickReply('요금제에 대해 알고 싶어요')">
+                    💰 요금제에 대해 알고 싶어요
+                </button>
+                <button class="reply-btn" onclick="sendQuickReply('기술적인 문제가 있어요')">
+                    🔧 기술적인 문제가 있어요
+                </button>
+                <button class="reply-btn" onclick="sendQuickReply('기타 문의사항')">
+                    💬 기타 문의사항
+                </button>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            상담원이 입력 중입니다
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+
+        <div class="chat-input">
+            <input type="text" class="input-field" id="messageInput" placeholder="메시지를 입력하세요..." onkeypress="handleKeyPress(event)">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 메시지 데이터를 localStorage에 저장하여 상담원과 공유
+        let customerData = {
+            id: 'customer_' + Date.now(),
+            name: '고객',
+            messages: [],
+            lastActivity: Date.now(),
+            unread: 0
+        };
+
+        // localStorage에서 기존 데이터 로드
+        const existingData = localStorage.getItem('chatData');
+        if (existingData) {
+            const chatData = JSON.parse(existingData);
+            if (chatData.customer) {
+                customerData = chatData.customer;
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            const messageObj = {
+                id: Date.now(),
+                type: 'customer',
+                content: message,
+                time: getCurrentTime(),
+                timestamp: Date.now()
+            };
+            
+            addUserMessage(messageObj);
+            saveMessageToStorage(messageObj);
+            input.value = '';
+            
+            // 상담원 응답 대기 표시
+            showTyping();
+            
+            // 실제 운영시에는 웹소켓이나 서버 통신으로 상담원에게 전송
+            // 여기서는 시뮬레이션으로 자동 응답
+            setTimeout(() => {
+                hideTyping();
+                // 상담원이 직접 답변할 때까지 대기 (실제로는 자동응답 없음)
+            }, 2000);
+        }
+
+        function sendQuickReply(message) {
+            const messageObj = {
+                id: Date.now(),
+                type: 'customer',
+                content: message,
+                time: getCurrentTime(),
+                timestamp: Date.now()
+            };
+            
+            addUserMessage(messageObj);
+            saveMessageToStorage(messageObj);
+            
+            showTyping();
+            setTimeout(() => {
+                hideTyping();
+            }, 2000);
+        }
+
+        function addUserMessage(messageObj) {
+            const messagesContainer = document.getElementById('messages');
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.innerHTML = `
+                <div class="message-avatar user-avatar">고</div>
+                <div>
+                    <div class="message-content">${messageObj.content}</div>
+                    <div class="message-time">${messageObj.time}</div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function addAgentMessage(messageObj) {
+            const messagesContainer = document.getElementById('messages');
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <div class="message-avatar agent-avatar">정</div>
+                <div>
+                    <div class="message-content">${messageObj.content}</div>
+                    <div class="message-time">${messageObj.time}</div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function saveMessageToStorage(messageObj) {
+            customerData.messages.push(messageObj);
+            customerData.lastActivity = Date.now();
+            customerData.unread++;
+            
+            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
+            chatData.customer = customerData;
+            localStorage.setItem('chatData', JSON.stringify(chatData));
+        }
+
+        function showTyping() {
+            document.getElementById('typingIndicator').style.display = 'block';
+            scrollToBottom();
+        }
+
+        function hideTyping() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        function getCurrentTime() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const ampm = hours >= 12 ? '오후' : '오전';
+            const displayHours = hours % 12 || 12;
+            return `${ampm} ${displayHours}:${minutes.toString().padStart(2, '0')}`;
+        }
+
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('messages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function closeChat() {
+            if (confirm('채팅을 종료하시겠습니까?')) {
+                window.close();
+            }
+        }
+
+        // 상담원 응답 체크 (실시간 데이터 확인)
+        function checkForAgentMessages() {
+            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
+            if (chatData.agentMessages) {
+                chatData.agentMessages.forEach(msg => {
+                    if (!customerData.messages.find(m => m.id === msg.id)) {
+                        addAgentMessage(msg);
+                        customerData.messages.push(msg);
+                    }
+                });
+                
+                // 처리된 상담원 메시지 제거
+                delete chatData.agentMessages;
+                localStorage.setItem('chatData', JSON.stringify(chatData));
+            }
+        }
+
+        // 연결 상태 업데이트
+        function updateConnectionStatus() {
+            const status = document.getElementById('connectionStatus');
+            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
+            
+            if (chatData.agentOnline) {
+                status.textContent = '🟢 상담원과 연결됨';
+                status.className = 'connection-status';
+            } else {
+                status.textContent = '🟡 상담원 연결 대기중';
+                status.className = 'connection-status';
+            }
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('messageInput').focus();
+            
+            // 주기적으로 상담원 메시지 확인
+            setInterval(checkForAgentMessages, 1000);
+            
+            // 연결 상태 확인
+            setInterval(updateConnectionStatus, 2000);
+            
+            // 고객 데이터 초기 저장
+            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
+            chatData.customer = customerData;
+            localStorage.setItem('chatData', JSON.stringify(chatData));
+        });
+    </script>
+</body>
+</html>
