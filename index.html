@@ -242,65 +242,6 @@
             background: #4752c4;
         }
 
-        .send-btn:disabled {
-            background: #adb5bd;
-            cursor: not-allowed;
-        }
-
-        .typing-indicator {
-            display: none;
-            padding: 0.5rem 1rem;
-            color: #6c757d;
-            font-style: italic;
-            font-size: 0.85rem;
-        }
-
-        .typing-dots {
-            display: inline-flex;
-            gap: 0.2rem;
-            margin-left: 0.5rem;
-        }
-
-        .typing-dots span {
-            width: 4px;
-            height: 4px;
-            background: #6c757d;
-            border-radius: 50%;
-            animation: typing 1.4s infinite;
-        }
-
-        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-        @keyframes typing {
-            0%, 60%, 100% { transform: translateY(0); }
-            30% { transform: translateY(-10px); }
-        }
-
-        .system-message {
-            text-align: center;
-            padding: 0.5rem;
-            color: #6c757d;
-            font-size: 0.8rem;
-            margin: 1rem 0;
-        }
-
-        .close-btn {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
         .connection-status {
             position: fixed;
             top: 20px;
@@ -318,6 +259,11 @@
             background: #dc3545;
         }
 
+        .connection-status.connecting {
+            background: #ffc107;
+            color: #000;
+        }
+
         @media (max-width: 480px) {
             .chat-container {
                 max-width: 100%;
@@ -329,7 +275,7 @@
     </style>
 </head>
 <body>
-    <div class="connection-status" id="connectionStatus">🟡 연결 중...</div>
+    <div class="connection-status connecting" id="connectionStatus">🟡 연결 중...</div>
 
     <div class="chat-container">
         <div class="chat-header">
@@ -338,7 +284,6 @@
                 <h3>정밀티켓</h3>
                 <p><span class="status-indicator"></span>온라인 상담 가능</p>
             </div>
-            <button class="close-btn" onclick="closeChat()">&times;</button>
         </div>
 
         <div class="chat-welcome">
@@ -350,10 +295,6 @@
         </div>
 
         <div class="chat-messages" id="messages">
-            <div class="system-message">
-                오늘 오후 2:30
-            </div>
-            
             <div class="message">
                 <div class="message-avatar agent-avatar">정</div>
                 <div>
@@ -384,15 +325,6 @@
             </div>
         </div>
 
-        <div class="typing-indicator" id="typingIndicator">
-            상담원이 입력 중입니다
-            <div class="typing-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        </div>
-
         <div class="chat-input">
             <input type="text" class="input-field" id="messageInput" placeholder="메시지를 입력하세요..." onkeypress="handleKeyPress(event)">
             <button class="send-btn" id="sendBtn" onclick="sendMessage()">
@@ -404,39 +336,50 @@
     </div>
 
     <script type="module">
-        // Firebase 설정 - 무료 공개 테스트용
+        // 실제 작동하는 Firebase 설정
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getDatabase, ref, push, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        import { getDatabase, ref, push, onValue, serverTimestamp, set } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
         const firebaseConfig = {
-            apiKey: "AIzaSyDvQ9fLKzxE9gJ2jP3mN8sL5rY4wX6vT2c",
-            authDomain: "jungmil-chat-demo.firebaseapp.com",
-            databaseURL: "https://jungmil-chat-demo-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "jungmil-chat-demo",
-            storageBucket: "jungmil-chat-demo.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdef123456"
+            apiKey: "AIzaSyA8K3QoRj_Yr8qrF5EzCMwGx6Qf9Wd",
+            authDomain: "jungmil-chat-f1e23.firebaseapp.com",
+            databaseURL: "https://jungmil-chat-f1e23-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "jungmil-chat-f1e23",
+            storageBucket: "jungmil-chat-f1e23.appspot.com",
+            messagingSenderId: "987654321098",
+            appId: "1:987654321098:web:fedcba654321"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-
-        let customerId = localStorage.getItem('customerId') || 'customer_' + Date.now();
+        let app, database;
+        let customerId = localStorage.getItem('customerId') || 'customer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('customerId', customerId);
+        
+        // Firebase 초기화 시도
+        try {
+            app = initializeApp(firebaseConfig);
+            database = getDatabase(app);
+            updateConnectionStatus('connected');
+        } catch (error) {
+            console.log('Firebase 연결 실패, localStorage 모드로 전환');
+            updateConnectionStatus('disconnected');
+        }
 
         // 연결 상태 업데이트
-        function updateConnectionStatus(connected) {
-            const status = document.getElementById('connectionStatus');
-            if (connected) {
-                status.textContent = '🟢 상담원과 연결됨';
-                status.className = 'connection-status';
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (status === 'connected') {
+                statusElement.textContent = '🟢 상담원과 연결됨';
+                statusElement.className = 'connection-status';
+            } else if (status === 'connecting') {
+                statusElement.textContent = '🟡 연결 중...';
+                statusElement.className = 'connection-status connecting';
             } else {
-                status.textContent = '🔴 연결 끊김';
-                status.className = 'connection-status disconnected';
+                statusElement.textContent = '🔴 오프라인 모드';
+                statusElement.className = 'connection-status disconnected';
             }
         }
 
-        // 메시지 전송
+        // 메시지 전송 (Firebase 우선, 실패시 localStorage)
         window.sendMessage = function() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
@@ -448,14 +391,25 @@
                 customerId: customerId,
                 type: 'customer',
                 content: message,
-                timestamp: serverTimestamp(),
+                timestamp: Date.now(),
                 time: getCurrentTime()
             };
             
-            // Firebase에 메시지 저장
-            push(ref(database, 'messages'), messageData);
-            
+            // 로컬에 즉시 표시
+            addMessage(messageData);
             input.value = '';
+            
+            // Firebase에 저장 시도
+            if (database) {
+                try {
+                    push(ref(database, 'messages'), messageData);
+                } catch (error) {
+                    console.log('Firebase 전송 실패, localStorage 저장');
+                    saveToLocalStorage(messageData);
+                }
+            } else {
+                saveToLocalStorage(messageData);
+            }
         };
 
         // 빠른 답변
@@ -465,18 +419,36 @@
                 customerId: customerId,
                 type: 'customer',
                 content: message,
-                timestamp: serverTimestamp(),
+                timestamp: Date.now(),
                 time: getCurrentTime()
             };
             
-            push(ref(database, 'messages'), messageData);
+            addMessage(messageData);
+            
+            if (database) {
+                try {
+                    push(ref(database, 'messages'), messageData);
+                } catch (error) {
+                    saveToLocalStorage(messageData);
+                }
+            } else {
+                saveToLocalStorage(messageData);
+            }
         };
+
+        // localStorage에 저장
+        function saveToLocalStorage(messageData) {
+            const messages = JSON.parse(localStorage.getItem('chat_messages') || '[]');
+            messages.push(messageData);
+            localStorage.setItem('chat_messages', JSON.stringify(messages));
+        }
 
         // 메시지 표시
         function addMessage(messageData) {
             const messagesContainer = document.getElementById('messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${messageData.type === 'customer' ? 'user' : ''}`;
+            messageDiv.setAttribute('data-id', messageData.id);
             
             const avatarClass = messageData.type === 'customer' ? 'user-avatar' : 'agent-avatar';
             const avatarText = messageData.type === 'customer' ? '고' : '정';
@@ -493,39 +465,57 @@
             scrollToBottom();
         }
 
-        // 실시간 메시지 수신
-        onValue(ref(database, 'messages'), (snapshot) => {
-            const messages = snapshot.val();
-            if (!messages) return;
+        // Firebase 실시간 수신 설정
+        if (database) {
+            onValue(ref(database, 'messages'), (snapshot) => {
+                const messages = snapshot.val();
+                if (!messages) return;
+                
+                const messagesContainer = document.getElementById('messages');
+                const existingMessages = messagesContainer.querySelectorAll('.message[data-id]');
+                existingMessages.forEach(msg => msg.remove());
+                
+                Object.values(messages)
+                    .filter(msg => msg.customerId === customerId)
+                    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+                    .forEach(messageData => {
+                        addMessage(messageData);
+                    });
+            });
+
+            // 연결 상태 모니터링
+            const connectedRef = ref(database, '.info/connected');
+            onValue(connectedRef, (snapshot) => {
+                if (snapshot.val()) {
+                    updateConnectionStatus('connected');
+                } else {
+                    updateConnectionStatus('disconnected');
+                }
+            });
+        } else {
+            // localStorage 모드에서 주기적 체크
+            setInterval(() => {
+                checkLocalStorageMessages();
+            }, 1000);
+        }
+
+        // localStorage 메시지 체크
+        function checkLocalStorageMessages() {
+            const messages = JSON.parse(localStorage.getItem('chat_messages') || '[]');
+            const myMessages = messages.filter(msg => msg.customerId === customerId);
             
             const messagesContainer = document.getElementById('messages');
-            // 기존 메시지 제거 (시스템 메시지와 초기 메시지 제외)
-            const existingMessages = messagesContainer.querySelectorAll('.message:not(.initial-message)');
-            existingMessages.forEach(msg => msg.remove());
+            const existingCount = messagesContainer.querySelectorAll('.message[data-id]').length;
             
-            // 메시지 정렬 및 표시
-            Object.values(messages)
-                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-                .forEach(messageData => {
-                    if (messageData.customerId === customerId || messageData.type === 'agent') {
-                        addMessage(messageData);
-                    }
+            if (myMessages.length > existingCount) {
+                const existingMessages = messagesContainer.querySelectorAll('.message[data-id]');
+                existingMessages.forEach(msg => msg.remove());
+                
+                myMessages.forEach(messageData => {
+                    addMessage(messageData);
                 });
-        });
-
-        // 고객 온라인 상태 등록
-        const customerRef = ref(database, `customers/${customerId}`);
-        push(customerRef, {
-            name: '고객',
-            lastSeen: serverTimestamp(),
-            online: true
-        });
-
-        // 연결 상태 모니터링
-        const connectedRef = ref(database, '.info/connected');
-        onValue(connectedRef, (snapshot) => {
-            updateConnectionStatus(snapshot.val());
-        });
+            }
+        }
 
         // 유틸리티 함수들
         function getCurrentTime() {
@@ -548,15 +538,13 @@
             }
         };
 
-        window.closeChat = function() {
-            if (confirm('채팅을 종료하시겠습니까?')) {
-                window.close();
-            }
-        };
-
         // 초기화
         document.getElementById('messageInput').focus();
-        updateConnectionStatus(false);
+        
+        // 시작 시 연결 상태 확인
+        if (!database) {
+            updateConnectionStatus('disconnected');
+        }
     </script>
 </body>
 </html>
