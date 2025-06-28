@@ -329,7 +329,7 @@
     </style>
 </head>
 <body>
-    <div class="connection-status" id="connectionStatus">🟢 상담원과 연결됨</div>
+    <div class="connection-status" id="connectionStatus">🟡 연결 중...</div>
 
     <div class="chat-container">
         <div class="chat-header">
@@ -403,82 +403,89 @@
         </div>
     </div>
 
-    <script>
-        // 메시지 데이터를 localStorage에 저장하여 상담원과 공유
-        let customerData = {
-            id: 'customer_' + Date.now(),
-            name: '고객',
-            messages: [],
-            lastActivity: Date.now(),
-            unread: 0
+    <script type="module">
+        // Firebase 설정 - 무료 공개 테스트용
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, push, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDvQ9fLKzxE9gJ2jP3mN8sL5rY4wX6vT2c",
+            authDomain: "jungmil-chat-demo.firebaseapp.com",
+            databaseURL: "https://jungmil-chat-demo-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "jungmil-chat-demo",
+            storageBucket: "jungmil-chat-demo.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456"
         };
 
-        // localStorage에서 기존 데이터 로드
-        const existingData = localStorage.getItem('chatData');
-        if (existingData) {
-            const chatData = JSON.parse(existingData);
-            if (chatData.customer) {
-                customerData = chatData.customer;
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        let customerId = localStorage.getItem('customerId') || 'customer_' + Date.now();
+        localStorage.setItem('customerId', customerId);
+
+        // 연결 상태 업데이트
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            if (connected) {
+                status.textContent = '🟢 상담원과 연결됨';
+                status.className = 'connection-status';
+            } else {
+                status.textContent = '🔴 연결 끊김';
+                status.className = 'connection-status disconnected';
             }
         }
 
-        function sendMessage() {
+        // 메시지 전송
+        window.sendMessage = function() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
             
             if (!message) return;
             
-            const messageObj = {
+            const messageData = {
                 id: Date.now(),
+                customerId: customerId,
                 type: 'customer',
                 content: message,
-                time: getCurrentTime(),
-                timestamp: Date.now()
+                timestamp: serverTimestamp(),
+                time: getCurrentTime()
             };
             
-            addUserMessage(messageObj);
-            saveMessageToStorage(messageObj);
+            // Firebase에 메시지 저장
+            push(ref(database, 'messages'), messageData);
+            
             input.value = '';
-            
-            // 상담원 응답 대기 표시
-            showTyping();
-            
-            // 실제 운영시에는 웹소켓이나 서버 통신으로 상담원에게 전송
-            // 여기서는 시뮬레이션으로 자동 응답
-            setTimeout(() => {
-                hideTyping();
-                // 상담원이 직접 답변할 때까지 대기 (실제로는 자동응답 없음)
-            }, 2000);
-        }
+        };
 
-        function sendQuickReply(message) {
-            const messageObj = {
+        // 빠른 답변
+        window.sendQuickReply = function(message) {
+            const messageData = {
                 id: Date.now(),
+                customerId: customerId,
                 type: 'customer',
                 content: message,
-                time: getCurrentTime(),
-                timestamp: Date.now()
+                timestamp: serverTimestamp(),
+                time: getCurrentTime()
             };
             
-            addUserMessage(messageObj);
-            saveMessageToStorage(messageObj);
-            
-            showTyping();
-            setTimeout(() => {
-                hideTyping();
-            }, 2000);
-        }
+            push(ref(database, 'messages'), messageData);
+        };
 
-        function addUserMessage(messageObj) {
+        // 메시지 표시
+        function addMessage(messageData) {
             const messagesContainer = document.getElementById('messages');
-            
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message user';
+            messageDiv.className = `message ${messageData.type === 'customer' ? 'user' : ''}`;
+            
+            const avatarClass = messageData.type === 'customer' ? 'user-avatar' : 'agent-avatar';
+            const avatarText = messageData.type === 'customer' ? '고' : '정';
+            
             messageDiv.innerHTML = `
-                <div class="message-avatar user-avatar">고</div>
+                <div class="message-avatar ${avatarClass}">${avatarText}</div>
                 <div>
-                    <div class="message-content">${messageObj.content}</div>
-                    <div class="message-time">${messageObj.time}</div>
+                    <div class="message-content">${messageData.content}</div>
+                    <div class="message-time">${messageData.time}</div>
                 </div>
             `;
             
@@ -486,42 +493,41 @@
             scrollToBottom();
         }
 
-        function addAgentMessage(messageObj) {
+        // 실시간 메시지 수신
+        onValue(ref(database, 'messages'), (snapshot) => {
+            const messages = snapshot.val();
+            if (!messages) return;
+            
             const messagesContainer = document.getElementById('messages');
+            // 기존 메시지 제거 (시스템 메시지와 초기 메시지 제외)
+            const existingMessages = messagesContainer.querySelectorAll('.message:not(.initial-message)');
+            existingMessages.forEach(msg => msg.remove());
             
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            messageDiv.innerHTML = `
-                <div class="message-avatar agent-avatar">정</div>
-                <div>
-                    <div class="message-content">${messageObj.content}</div>
-                    <div class="message-time">${messageObj.time}</div>
-                </div>
-            `;
-            
-            messagesContainer.appendChild(messageDiv);
-            scrollToBottom();
-        }
+            // 메시지 정렬 및 표시
+            Object.values(messages)
+                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+                .forEach(messageData => {
+                    if (messageData.customerId === customerId || messageData.type === 'agent') {
+                        addMessage(messageData);
+                    }
+                });
+        });
 
-        function saveMessageToStorage(messageObj) {
-            customerData.messages.push(messageObj);
-            customerData.lastActivity = Date.now();
-            customerData.unread++;
-            
-            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
-            chatData.customer = customerData;
-            localStorage.setItem('chatData', JSON.stringify(chatData));
-        }
+        // 고객 온라인 상태 등록
+        const customerRef = ref(database, `customers/${customerId}`);
+        push(customerRef, {
+            name: '고객',
+            lastSeen: serverTimestamp(),
+            online: true
+        });
 
-        function showTyping() {
-            document.getElementById('typingIndicator').style.display = 'block';
-            scrollToBottom();
-        }
+        // 연결 상태 모니터링
+        const connectedRef = ref(database, '.info/connected');
+        onValue(connectedRef, (snapshot) => {
+            updateConnectionStatus(snapshot.val());
+        });
 
-        function hideTyping() {
-            document.getElementById('typingIndicator').style.display = 'none';
-        }
-
+        // 유틸리티 함수들
         function getCurrentTime() {
             const now = new Date();
             const hours = now.getHours();
@@ -536,64 +542,21 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        function handleKeyPress(event) {
+        window.handleKeyPress = function(event) {
             if (event.key === 'Enter') {
                 sendMessage();
             }
-        }
+        };
 
-        function closeChat() {
+        window.closeChat = function() {
             if (confirm('채팅을 종료하시겠습니까?')) {
                 window.close();
             }
-        }
-
-        // 상담원 응답 체크 (실시간 데이터 확인)
-        function checkForAgentMessages() {
-            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
-            if (chatData.agentMessages) {
-                chatData.agentMessages.forEach(msg => {
-                    if (!customerData.messages.find(m => m.id === msg.id)) {
-                        addAgentMessage(msg);
-                        customerData.messages.push(msg);
-                    }
-                });
-                
-                // 처리된 상담원 메시지 제거
-                delete chatData.agentMessages;
-                localStorage.setItem('chatData', JSON.stringify(chatData));
-            }
-        }
-
-        // 연결 상태 업데이트
-        function updateConnectionStatus() {
-            const status = document.getElementById('connectionStatus');
-            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
-            
-            if (chatData.agentOnline) {
-                status.textContent = '🟢 상담원과 연결됨';
-                status.className = 'connection-status';
-            } else {
-                status.textContent = '🟡 상담원 연결 대기중';
-                status.className = 'connection-status';
-            }
-        }
+        };
 
         // 초기화
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('messageInput').focus();
-            
-            // 주기적으로 상담원 메시지 확인
-            setInterval(checkForAgentMessages, 1000);
-            
-            // 연결 상태 확인
-            setInterval(updateConnectionStatus, 2000);
-            
-            // 고객 데이터 초기 저장
-            const chatData = JSON.parse(localStorage.getItem('chatData') || '{}');
-            chatData.customer = customerData;
-            localStorage.setItem('chatData', JSON.stringify(chatData));
-        });
+        document.getElementById('messageInput').focus();
+        updateConnectionStatus(false);
     </script>
 </body>
 </html>
