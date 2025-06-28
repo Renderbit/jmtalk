@@ -255,15 +255,6 @@
             z-index: 1000;
         }
 
-        .connection-status.disconnected {
-            background: #dc3545;
-        }
-
-        .connection-status.connecting {
-            background: #ffc107;
-            color: #000;
-        }
-
         @media (max-width: 480px) {
             .chat-container {
                 max-width: 100%;
@@ -275,7 +266,7 @@
     </style>
 </head>
 <body>
-    <div class="connection-status connecting" id="connectionStatus">🟡 연결 중...</div>
+    <div class="connection-status" id="connectionStatus">🟢 상담원과 연결됨</div>
 
     <div class="chat-container">
         <div class="chat-header">
@@ -335,51 +326,14 @@
         </div>
     </div>
 
-    <script type="module">
-        // 실제 작동하는 Firebase 설정
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getDatabase, ref, push, onValue, serverTimestamp, set } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyA8K3QoRj_Yr8qrF5EzCMwGx6Qf9Wd",
-            authDomain: "jungmil-chat-f1e23.firebaseapp.com",
-            databaseURL: "https://jungmil-chat-f1e23-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "jungmil-chat-f1e23",
-            storageBucket: "jungmil-chat-f1e23.appspot.com",
-            messagingSenderId: "987654321098",
-            appId: "1:987654321098:web:fedcba654321"
-        };
-
-        let app, database;
+    <script>
+        // 간단하고 확실한 localStorage 기반 채팅
         let customerId = localStorage.getItem('customerId') || 'customer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('customerId', customerId);
         
-        // Firebase 초기화 시도
-        try {
-            app = initializeApp(firebaseConfig);
-            database = getDatabase(app);
-            updateConnectionStatus('connected');
-        } catch (error) {
-            console.log('Firebase 연결 실패, localStorage 모드로 전환');
-            updateConnectionStatus('disconnected');
-        }
+        let lastMessageCount = 0;
 
-        // 연결 상태 업데이트
-        function updateConnectionStatus(status) {
-            const statusElement = document.getElementById('connectionStatus');
-            if (status === 'connected') {
-                statusElement.textContent = '🟢 상담원과 연결됨';
-                statusElement.className = 'connection-status';
-            } else if (status === 'connecting') {
-                statusElement.textContent = '🟡 연결 중...';
-                statusElement.className = 'connection-status connecting';
-            } else {
-                statusElement.textContent = '🔴 오프라인 모드';
-                statusElement.className = 'connection-status disconnected';
-            }
-        }
-
-        // 메시지 전송 (Firebase 우선, 실패시 localStorage)
+        // 메시지 전송
         window.sendMessage = function() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
@@ -399,17 +353,8 @@
             addMessage(messageData);
             input.value = '';
             
-            // Firebase에 저장 시도
-            if (database) {
-                try {
-                    push(ref(database, 'messages'), messageData);
-                } catch (error) {
-                    console.log('Firebase 전송 실패, localStorage 저장');
-                    saveToLocalStorage(messageData);
-                }
-            } else {
-                saveToLocalStorage(messageData);
-            }
+            // localStorage에 저장
+            saveMessage(messageData);
         };
 
         // 빠른 답변
@@ -424,23 +369,17 @@
             };
             
             addMessage(messageData);
-            
-            if (database) {
-                try {
-                    push(ref(database, 'messages'), messageData);
-                } catch (error) {
-                    saveToLocalStorage(messageData);
-                }
-            } else {
-                saveToLocalStorage(messageData);
-            }
+            saveMessage(messageData);
         };
 
-        // localStorage에 저장
-        function saveToLocalStorage(messageData) {
-            const messages = JSON.parse(localStorage.getItem('chat_messages') || '[]');
+        // 메시지 저장
+        function saveMessage(messageData) {
+            let messages = JSON.parse(localStorage.getItem('jm_chat_messages') || '[]');
             messages.push(messageData);
-            localStorage.setItem('chat_messages', JSON.stringify(messages));
+            localStorage.setItem('jm_chat_messages', JSON.stringify(messages));
+            
+            // 업데이트 플래그 설정
+            localStorage.setItem('jm_chat_updated', Date.now().toString());
         }
 
         // 메시지 표시
@@ -465,55 +404,23 @@
             scrollToBottom();
         }
 
-        // Firebase 실시간 수신 설정
-        if (database) {
-            onValue(ref(database, 'messages'), (snapshot) => {
-                const messages = snapshot.val();
-                if (!messages) return;
-                
+        // 새 메시지 체크
+        function checkNewMessages() {
+            const messages = JSON.parse(localStorage.getItem('jm_chat_messages') || '[]');
+            const myMessages = messages.filter(msg => msg.customerId === customerId);
+            
+            if (myMessages.length > lastMessageCount) {
+                // 기존 메시지 제거 (초기 메시지 제외)
                 const messagesContainer = document.getElementById('messages');
                 const existingMessages = messagesContainer.querySelectorAll('.message[data-id]');
                 existingMessages.forEach(msg => msg.remove());
                 
-                Object.values(messages)
-                    .filter(msg => msg.customerId === customerId)
-                    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-                    .forEach(messageData => {
-                        addMessage(messageData);
-                    });
-            });
-
-            // 연결 상태 모니터링
-            const connectedRef = ref(database, '.info/connected');
-            onValue(connectedRef, (snapshot) => {
-                if (snapshot.val()) {
-                    updateConnectionStatus('connected');
-                } else {
-                    updateConnectionStatus('disconnected');
-                }
-            });
-        } else {
-            // localStorage 모드에서 주기적 체크
-            setInterval(() => {
-                checkLocalStorageMessages();
-            }, 1000);
-        }
-
-        // localStorage 메시지 체크
-        function checkLocalStorageMessages() {
-            const messages = JSON.parse(localStorage.getItem('chat_messages') || '[]');
-            const myMessages = messages.filter(msg => msg.customerId === customerId);
-            
-            const messagesContainer = document.getElementById('messages');
-            const existingCount = messagesContainer.querySelectorAll('.message[data-id]').length;
-            
-            if (myMessages.length > existingCount) {
-                const existingMessages = messagesContainer.querySelectorAll('.message[data-id]');
-                existingMessages.forEach(msg => msg.remove());
-                
+                // 모든 메시지 다시 표시
                 myMessages.forEach(messageData => {
                     addMessage(messageData);
                 });
+                
+                lastMessageCount = myMessages.length;
             }
         }
 
@@ -541,10 +448,10 @@
         // 초기화
         document.getElementById('messageInput').focus();
         
-        // 시작 시 연결 상태 확인
-        if (!database) {
-            updateConnectionStatus('disconnected');
-        }
+        // 1초마다 새 메시지 체크
+        setInterval(checkNewMessages, 1000);
+        
+        console.log('고객 ID:', customerId);
     </script>
 </body>
 </html>
